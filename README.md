@@ -30,6 +30,11 @@
 
 サンプルSTLも `STL/` に入っています。
 
+### Netlify について
+
+Netlify のような静的ホスティングには `server_app.py` はそのまま置けません。
+フロントを Netlify に置く場合は、別の Python サーバーを立てて `APIベースURL` に設定してください。
+
 ## 配布用フォルダ
 
 - `web_deploy/`
@@ -42,6 +47,9 @@
   - `vendor/`
   - `STL/`
   - `README.md`
+- `web_deploy_prod/`
+  - 本番Webサーバー用の最小構成
+  - `requirements.txt` 付き
 
 ## 生成されるファイル
 

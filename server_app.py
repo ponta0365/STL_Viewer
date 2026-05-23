@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -22,6 +23,12 @@ VENDOR_DIR = ROOT / "vendor"
 ID_RE = re.compile(r"^(?P<id>[0-9a-f]{32})__(?P<name>.+)$", re.IGNORECASE)
 
 app = FastAPI(title="STL Viewer Web App")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 if VENDOR_DIR.exists():
     app.mount("/vendor", StaticFiles(directory=VENDOR_DIR), name="vendor")
 

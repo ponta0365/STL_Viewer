@@ -366,9 +366,9 @@
         </div>
       </section>
 
-    <section class="panel">
-      <h2>表示設定</h2>
-      <div class="stack">
+      <section class="panel">
+        <h2>表示設定</h2>
+        <div class="stack">
           <label class="field">
             <span>モデル色</span>
             <input id="modelColor" type="color" value="#00ccff">
@@ -404,6 +404,21 @@
           <div class="row">
             <button id="exportWebpBtn" type="button" class="secondary">透過WEBP保存</button>
           </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>API接続</h2>
+        <div class="stack">
+          <label class="field">
+            <span>APIベースURL</span>
+            <input id="apiBaseInput" type="url" placeholder="https://api.example.com">
+          </label>
+          <div class="row">
+            <button id="saveApiBaseBtn" type="button">保存</button>
+            <button id="resetApiBaseBtn" type="button" class="secondary">現在のホストを使用</button>
+          </div>
+          <div class="muted">Netlifyの静的配信では、別のPythonサーバーURLを設定してください。</div>
         </div>
       </section>
 
@@ -482,6 +497,7 @@
 
   <script>
     const UI_STATE_KEY = "stl-viewer-ui-state-v1";
+    const API_BASE_KEY = "stl-viewer-api-base-url-v1";
     const API_MODELS = "/api/models";
     const API_STATE = "/api/state";
 
@@ -507,6 +523,9 @@
     const exportScaleSelect = document.getElementById("exportScaleSelect");
     const exportGridCheck = document.getElementById("exportGridCheck");
     const exportWebpBtn = document.getElementById("exportWebpBtn");
+    const apiBaseInput = document.getElementById("apiBaseInput");
+    const saveApiBaseBtn = document.getElementById("saveApiBaseBtn");
+    const resetApiBaseBtn = document.getElementById("resetApiBaseBtn");
     const posXInput = document.getElementById("posXInput");
     const posYInput = document.getElementById("posYInput");
     const posZInput = document.getElementById("posZInput");
@@ -525,6 +544,7 @@
       position: [0, 0, 0],
       rotation: [0, 0, 0],
     };
+    let apiBaseUrl = loadApiBaseUrl();
 
     let scene;
     let camera;
@@ -540,6 +560,7 @@
     exportScaleSelect.value = String(state.exportScale || 2);
     exportGridCheck.checked = Boolean(state.exportGrid);
     includeSubdirsCheck.checked = state.includeSubdirs !== false;
+    apiBaseInput.value = apiBaseUrl;
 
     function degToRad(value) {
       return (Number(value) || 0) * Math.PI / 180;
@@ -577,8 +598,26 @@
       uploadStatus.style.color = isError ? "var(--danger)" : "var(--muted)";
     }
 
+    function loadApiBaseUrl() {
+      try {
+        const params = new URLSearchParams(location.search);
+        const queryValue = params.get("api");
+        const storedValue = localStorage.getItem(API_BASE_KEY);
+        const injectedValue = window.STL_VIEWER_API_BASE_URL;
+        return String(queryValue || storedValue || injectedValue || location.origin).trim().replace(/\/+$/, "");
+      } catch (error) {
+        return location.origin;
+      }
+    }
+
+    function saveApiBaseUrl(value) {
+      apiBaseUrl = String(value || location.origin).trim().replace(/\/+$/, "") || location.origin;
+      localStorage.setItem(API_BASE_KEY, apiBaseUrl);
+      apiBaseInput.value = apiBaseUrl;
+    }
+
     function apiPath(path) {
-      return path.startsWith("/") ? path : `/${path}`;
+      return new URL(path, apiBaseUrl.endsWith("/") ? apiBaseUrl : `${apiBaseUrl}/`).href;
     }
 
     async function apiRequest(path, options = {}) {
@@ -1254,6 +1293,16 @@
       });
 
       document.getElementById("alignBaseBtn").addEventListener("click", () => alignBaseToGround());
+      saveApiBaseBtn.addEventListener("click", async () => {
+        saveApiBaseUrl(apiBaseInput.value || location.origin);
+        setUploadStatus(`API接続先を保存しました: ${apiBaseUrl}`);
+        await reloadLibraryFromServer();
+      });
+      resetApiBaseBtn.addEventListener("click", async () => {
+        saveApiBaseUrl(location.origin);
+        setUploadStatus(`API接続先を現在のホストに戻しました: ${apiBaseUrl}`);
+        await reloadLibraryFromServer();
+      });
       exportWebpBtn.addEventListener("click", async () => {
         try {
           await exportTransparentWebp();
@@ -1333,7 +1382,8 @@
 
     bootstrap().catch((error) => {
       console.error(error);
-      showEmptyModelInfo("初期化に失敗しました。コンソールを確認してください。");
+      showEmptyModelInfo("初期化に失敗しました。API接続先を確認してください。");
+      setUploadStatus(`初期化失敗: ${error?.message || error}`, true);
     });
   </script>
 </body>
