@@ -50,6 +50,12 @@ Render の Python Web Service として `render.yaml` を使うのが標準で�
 
 - `web_deploy/`
   - ローカル起動用スクリプトも含めた一式
+- `netlify_deploy/`
+  - Netlify に置く静的フロントの最小構成
+  - `STL-viewer.html`
+  - `index.html`
+  - `vendor/`
+  - `STL/`
 - `web_deploy_prod/`
   - 本番Webサーバー用の最小構成
   - `server_app.py`
