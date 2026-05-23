@@ -30,6 +30,19 @@
 
 サンプルSTLも `STL/` に入っています。
 
+## 配布用フォルダ
+
+- `web_deploy/`
+  - ローカル起動用スクリプトも含めた一式
+- `web_deploy_prod/`
+  - 本番Webサーバー用の最小構成
+  - `server_app.py`
+  - `STL-viewer.html`
+  - `index.html`
+  - `vendor/`
+  - `STL/`
+  - `README.md`
+
 ## 生成されるファイル
 
 - `web_state.json`
