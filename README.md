@@ -30,10 +30,21 @@
 
 サンプルSTLも `STL/` に入っています。
 
-### Netlify について
+### Render で公開する場合
 
-Netlify のような静的ホスティングには `server_app.py` はそのまま置けません。
-フロントを Netlify に置く場合は、別の Python サーバーを立てて `APIベースURL` に設定してください。
+Render の Python Web Service として `render.yaml` を使うのが標準です。
+
+- `render.yaml`
+- `requirements.txt`
+- `server_app.py`
+- `STL-viewer.html`
+- `vendor/`
+- `STL/`
+
+を使えば、同一ホストでフロントと API をまとめて公開できます。
+
+永続化が必要なので、Render では `STORAGE_DIR` を永続ディスクに向けています。
+もしディスクを付けない場合、STL のアップロード結果や状態は再デプロイで消えます。
 
 ## 配布用フォルダ
 
@@ -49,7 +60,7 @@ Netlify のような静的ホスティングには `server_app.py` はそのま�
   - `README.md`
 - `web_deploy_prod/`
   - 本番Webサーバー用の最小構成
-  - `requirements.txt` 付き
+  - `requirements.txt` / `render.yaml` 付き
 
 ## 生成されるファイル
 

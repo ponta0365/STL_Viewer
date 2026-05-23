@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import uuid
 from datetime import datetime, timezone
@@ -15,8 +16,9 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parent
-MODEL_DIR = ROOT / "STL"
-STATE_PATH = ROOT / "web_state.json"
+DATA_ROOT = Path(os.environ.get("STORAGE_DIR", str(ROOT))).resolve()
+MODEL_DIR = DATA_ROOT / "STL"
+STATE_PATH = DATA_ROOT / "web_state.json"
 VIEWER_PATH = ROOT / "STL-viewer.html"
 VENDOR_DIR = ROOT / "vendor"
 
@@ -38,6 +40,7 @@ def utc_now() -> str:
 
 
 def ensure_storage() -> None:
+    DATA_ROOT.mkdir(parents=True, exist_ok=True)
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     if not STATE_PATH.exists():
         write_state(
