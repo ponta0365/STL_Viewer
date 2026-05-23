@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+logs/
+web_state.json
+ai_state.json
+launch-out.txt
+launch-err.txt
+server-out.txt
+server-err.txt
+STLViewer一体型.exe
+STL/*.stl
+ソースコード/
+codex_generic_dev_manual.txt
+color_palette_32.json
+stl_category_list.json
+*.backup_*

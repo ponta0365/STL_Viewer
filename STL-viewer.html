@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>STL Viewer Local</title>
+  <script src="vendor/three/r128/three.min.js"></script>
+  <script src="vendor/three/r128/examples/js/loaders/STLLoader.js"></script>
+  <script src="vendor/three/r128/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    :root {
+      --bg: #0e1220;
+      --panel: rgba(18, 24, 42, 0.92);
+      --panel-soft: rgba(255, 255, 255, 0.06);
+      --text: #eef2ff;
+      --muted: #a7b0c5;
+      --accent: #5dd6ff;
+      --accent-strong: #27bde8;
+      --danger: #ff667d;
+      --border: rgba(255, 255, 255, 0.1);
+      --shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at top left, rgba(93, 214, 255, 0.18), transparent 35%),
+        radial-gradient(circle at bottom right, rgba(255, 102, 125, 0.12), transparent 28%),
+        linear-gradient(135deg, #0a0d17 0%, #10182b 48%, #0b1020 100%);
+      color: var(--text);
+      font-family: "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    }
+
+    #app {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      width: 100%;
+      height: 100%;
+    }
+
+    #sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 16px;
+      border-right: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(12, 17, 31, 0.95), rgba(16, 22, 40, 0.88));
+      backdrop-filter: blur(14px);
+      overflow: auto;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(93, 214, 255, 0.12), rgba(255, 255, 255, 0.04));
+      box-shadow: var(--shadow);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0.04em;
+    }
+
+    .brand p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .panel {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      color: #f6f8ff;
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    input[type="file"] {
+      width: 100%;
+      color: var(--muted);
+    }
+
+    input[type="color"] {
+      width: 100%;
+      height: 40px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel-soft);
+    }
+
+    input[type="checkbox"] {
+      transform: scale(1.08);
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: #08111f;
+      background: linear-gradient(135deg, #8de7ff, #4ac5f0);
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 10px 22px rgba(41, 168, 221, 0.25);
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); opacity: 0.92; }
+    button.secondary {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.06);
+      border-color: var(--border);
+      box-shadow: none;
+    }
+    button.danger {
+      color: #fff;
+      background: linear-gradient(135deg, #ff8193, #ff5d74);
+      box-shadow: 0 10px 22px rgba(255, 93, 116, 0.22);
+    }
+
+    #libraryList {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 42vh;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .library-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .library-item.active {
+      border-color: rgba(93, 214, 255, 0.45);
+      background: rgba(93, 214, 255, 0.12);
+    }
+
+    .library-item .meta {
+      min-width: 0;
+    }
+
+    .library-item .name {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .library-item .sub {
+      display: block;
+      margin-top: 3px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .library-item .actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .library-item .actions button {
+      padding: 8px 10px;
+      font-size: 12px;
+      box-shadow: none;
+    }
+
+    #viewer {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    #canvasHost {
+      width: 100%;
+      height: 100%;
+    }
+
+    #canvasHost canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #dropZone {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 3px dashed rgba(255, 255, 255, 0.35);
+      color: #fff;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      background: rgba(8, 12, 22, 0.7);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 3;
+    }
+
+    #dropZone.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    #hud {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 16px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    .hud-card {
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(18, 24, 42, 0.76);
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text);
+      min-width: 0;
+    }
+
+    .hud-card strong {
+      color: #ffffff;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 28px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+      vertical-align: middle;
+    }
+
+    @media (max-width: 980px) {
+      #app {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+      }
+
+      #sidebar {
+        max-height: 44vh;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+
+      #libraryList {
+        max-height: 24vh;
+      }
+
+      #hud {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <div class="brand">
+        <h1>STL Viewer Local</h1>
+        <p>STLファイルをサーバーへ登録して一覧から切り替えるWebアプリです。モデルの位置と回転はサーバー側に保存します。</p>
+      </div>
+
+      <section class="panel">
+        <h2>ファイル追加</h2>
+        <div class="stack">
+          <input id="folderInput" type="file" accept=".stl,.STL" webkitdirectory mozdirectory directory multiple style="display:none;">
+          <input id="fileInput" type="file" accept=".stl" multiple>
+          <div class="row" style="display:none;">
+            <button id="addFilesBtn" type="button">選択ファイルを追加</button>
+            <button id="reloadBtn" type="button" class="secondary">一覧を再読込</button>
+          </div>
+          <div class="row">
+            <button id="loadFolderBtn" type="button">フォルダを読み込み</button>
+          </div>
+          <label class="row" style="justify-content:space-between;">
+            <span>サブディレクトリも含める</span>
+            <input id="includeSubdirsCheck" type="checkbox" checked>
+          </label>
+          <div class="muted">ドラッグ&ドロップでも追加できます。</div>
+          <div id="uploadStatus" class="muted"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>保存済み一覧 <span id="countBadge" class="badge">0</span></h2>
+        <div id="libraryList"></div>
+        <div class="row" style="margin-top:12px;">
+          <button id="clearSelectionBtn" type="button" class="secondary">選択解除</button>
+          <button id="clearAllBtn" type="button" class="danger">全削除</button>
+        </div>
+      </section>
+
+    <section class="panel">
+      <h2>表示設定</h2>
+      <div class="stack">
+          <label class="field">
+            <span>モデル色</span>
+            <input id="modelColor" type="color" value="#00ccff">
+          </label>
+          <label class="field">
+            <span>輪郭線色</span>
+            <input id="edgeColor" type="color" value="#111111">
+          </label>
+          <label class="field">
+            <span>背景色</span>
+            <input id="backgroundColor" type="color" value="#f7f7fb">
+          </label>
+          <label class="row" style="justify-content:space-between;">
+            <span>半透明表示</span>
+            <input id="transparentCheck" type="checkbox">
+          </label>
+          <label class="row" style="justify-content:space-between;">
+            <span>輪郭線表示</span>
+            <input id="edgeVisibleCheck" type="checkbox" checked>
+          </label>
+          <label class="field">
+            <span>保存倍率</span>
+            <select id="exportScaleSelect">
+              <option value="1">1x</option>
+              <option value="2" selected>2x</option>
+              <option value="4">4x</option>
+            </select>
+          </label>
+          <label class="row" style="justify-content:space-between;">
+            <span>画像に土台グリッドを含める</span>
+            <input id="exportGridCheck" type="checkbox">
+          </label>
+          <div class="row">
+            <button id="exportWebpBtn" type="button" class="secondary">透過WEBP保存</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>モデル補正</h2>
+        <div class="stack">
+          <div class="field">
+            <span>位置補正</span>
+            <div class="row">
+              <label class="field" style="flex:1;">
+                <span>X</span>
+                <input id="posXInput" type="number" step="1" value="0">
+              </label>
+              <label class="field" style="flex:1;">
+                <span>Y</span>
+                <input id="posYInput" type="number" step="1" value="0">
+              </label>
+              <label class="field" style="flex:1;">
+                <span>Z</span>
+                <input id="posZInput" type="number" step="1" value="0">
+              </label>
+            </div>
+          </div>
+
+          <div class="field">
+            <span>回転補正</span>
+            <div class="row">
+              <label class="field" style="flex:1;">
+                <span>X°</span>
+                <input id="rotXInput" type="number" step="1" value="0">
+              </label>
+              <label class="field" style="flex:1;">
+                <span>Y°</span>
+                <input id="rotYInput" type="number" step="1" value="0">
+              </label>
+              <label class="field" style="flex:1;">
+                <span>Z°</span>
+                <input id="rotZInput" type="number" step="1" value="0">
+              </label>
+            </div>
+          </div>
+
+          <div class="row">
+            <button type="button" class="secondary" data-rotate-axis="x" data-rotate-dir="-1">X-90</button>
+            <button type="button" class="secondary" data-rotate-axis="x" data-rotate-dir="1">X+90</button>
+            <button type="button" class="secondary" data-rotate-axis="y" data-rotate-dir="-1">Y-90</button>
+            <button type="button" class="secondary" data-rotate-axis="y" data-rotate-dir="1">Y+90</button>
+            <button type="button" class="secondary" data-rotate-axis="z" data-rotate-dir="-1">Z-90</button>
+            <button type="button" class="secondary" data-rotate-axis="z" data-rotate-dir="1">Z+90</button>
+          </div>
+
+          <div class="row">
+            <button type="button" class="secondary" data-orientation-view="front">正面</button>
+            <button type="button" class="secondary" data-orientation-view="top">平面</button>
+            <button type="button" class="secondary" data-orientation-view="side">側面</button>
+          </div>
+          <div class="muted">正面・平面・側面はモデルの向き補正プリセットです。</div>
+
+          <div class="row">
+            <button type="button" class="secondary" id="alignBaseBtn">底面を土台に合わせる</button>
+            <button id="resetTransformBtn" type="button" class="danger">位置・回転をリセット</button>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <main id="viewer">
+      <div id="dropZone">ここにSTLファイルをドロップ</div>
+      <div id="canvasHost"></div>
+      <div id="hud">
+        <div class="hud-card" id="modelInfo">📁 <strong>モデル情報</strong><br><span class="muted">未読み込み</span></div>
+        <div class="hud-card" id="cameraInfo">📷 <strong>カメラ情報</strong><br><span class="muted">未取得</span></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const UI_STATE_KEY = "stl-viewer-ui-state-v1";
+    const API_MODELS = "/api/models";
+    const API_STATE = "/api/state";
+
+    const fileInput = document.getElementById("fileInput");
+    const folderInput = document.getElementById("folderInput");
+    const addFilesBtn = document.getElementById("addFilesBtn");
+    const reloadBtn = document.getElementById("reloadBtn");
+    const loadFolderBtn = document.getElementById("loadFolderBtn");
+    const includeSubdirsCheck = document.getElementById("includeSubdirsCheck");
+    const uploadStatus = document.getElementById("uploadStatus");
+    const clearSelectionBtn = document.getElementById("clearSelectionBtn");
+    const clearAllBtn = document.getElementById("clearAllBtn");
+    const libraryList = document.getElementById("libraryList");
+    const countBadge = document.getElementById("countBadge");
+    const dropZone = document.getElementById("dropZone");
+    const modelInfo = document.getElementById("modelInfo");
+    const cameraInfo = document.getElementById("cameraInfo");
+    const modelColorInput = document.getElementById("modelColor");
+    const edgeColorInput = document.getElementById("edgeColor");
+    const backgroundColorInput = document.getElementById("backgroundColor");
+    const transparentCheck = document.getElementById("transparentCheck");
+    const edgeVisibleCheck = document.getElementById("edgeVisibleCheck");
+    const exportScaleSelect = document.getElementById("exportScaleSelect");
+    const exportGridCheck = document.getElementById("exportGridCheck");
+    const exportWebpBtn = document.getElementById("exportWebpBtn");
+    const posXInput = document.getElementById("posXInput");
+    const posYInput = document.getElementById("posYInput");
+    const posZInput = document.getElementById("posZInput");
+    const rotXInput = document.getElementById("rotXInput");
+    const rotYInput = document.getElementById("rotYInput");
+    const rotZInput = document.getElementById("rotZInput");
+    const resetTransformBtn = document.getElementById("resetTransformBtn");
+
+    let currentModelId = null;
+    let currentRecord = null;
+    let mesh = null;
+    let edgeLines = null;
+    let modelGroup = null;
+    let gridHelper = null;
+    let currentTransform = {
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+    };
+
+    let scene;
+    let camera;
+    let renderer;
+    let controls;
+
+    const state = loadUIState();
+    modelColorInput.value = state.modelColor || modelColorInput.value;
+    edgeColorInput.value = state.edgeColor || edgeColorInput.value;
+    backgroundColorInput.value = state.backgroundColor || backgroundColorInput.value;
+    transparentCheck.checked = Boolean(state.transparent);
+    edgeVisibleCheck.checked = state.edgeVisible !== false;
+    exportScaleSelect.value = String(state.exportScale || 2);
+    exportGridCheck.checked = Boolean(state.exportGrid);
+    includeSubdirsCheck.checked = state.includeSubdirs !== false;
+
+    function degToRad(value) {
+      return (Number(value) || 0) * Math.PI / 180;
+    }
+
+    function radToDeg(value) {
+      return (Number(value) || 0) * 180 / Math.PI;
+    }
+
+    function loadUIState() {
+      try {
+        return JSON.parse(localStorage.getItem(UI_STATE_KEY)) || {};
+      } catch (error) {
+        return {};
+      }
+    }
+
+    function saveUIState(extra = {}) {
+      const payload = {
+        modelColor: modelColorInput.value,
+        edgeColor: edgeColorInput.value,
+        backgroundColor: backgroundColorInput.value,
+        transparent: transparentCheck.checked,
+        edgeVisible: edgeVisibleCheck.checked,
+        exportScale: Number(exportScaleSelect.value) || 2,
+        exportGrid: exportGridCheck.checked,
+        includeSubdirs: includeSubdirsCheck.checked,
+        ...extra,
+      };
+      localStorage.setItem(UI_STATE_KEY, JSON.stringify(payload));
+    }
+
+    function setUploadStatus(message, isError = false) {
+      uploadStatus.textContent = message || "";
+      uploadStatus.style.color = isError ? "var(--danger)" : "var(--muted)";
+    }
+
+    function apiPath(path) {
+      return path.startsWith("/") ? path : `/${path}`;
+    }
+
+    async function apiRequest(path, options = {}) {
+      const response = await fetch(apiPath(path), {
+        headers: {
+          ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+          ...(options.headers || {}),
+        },
+        ...options,
+      });
+      if (!response.ok) {
+        let message = `${response.status} ${response.statusText}`;
+        try {
+          const payload = await response.json();
+          if (payload?.detail) {
+            message = payload.detail;
+          }
+        } catch (error) {
+          try {
+            message = await response.text();
+          } catch (ignored) {}
+        }
+        throw new Error(message);
+      }
+      return response;
+    }
+
+    async function getAllModels() {
+      const response = await apiRequest(API_MODELS);
+      return response.json();
+    }
+
+    async function getModelById(id) {
+      const response = await apiRequest(`${API_MODELS}/${encodeURIComponent(id)}`);
+      return response.json();
+    }
+
+    async function getModelFileBlob(id) {
+      const response = await apiRequest(`${API_MODELS}/${encodeURIComponent(id)}/file`);
+      return response.blob();
+    }
+
+    async function getModelTransform(id) {
+      const response = await apiRequest(`${API_MODELS}/${encodeURIComponent(id)}/transform`);
+      return response.json();
+    }
+
+    async function uploadModels(files) {
+      const formData = new FormData();
+      Array.from(files || []).forEach((file) => {
+        if (file && file.name.toLowerCase().endsWith(".stl")) {
+          formData.append("files", file, file.name);
+        }
+      });
+      if (!Array.from(formData.keys()).length) {
+        return [];
+      }
+      const response = await apiRequest(API_MODELS, {
+        method: "POST",
+        body: formData,
+      });
+      return response.json();
+    }
+
+    async function deleteModel(id) {
+      await apiRequest(`${API_MODELS}/${encodeURIComponent(id)}`, { method: "DELETE" });
+    }
+
+    async function clearAllModels() {
+      await apiRequest(API_MODELS, { method: "DELETE" });
+    }
+
+    async function getServerState() {
+      const response = await apiRequest(API_STATE);
+      return response.json();
+    }
+
+    async function setServerSelection(selectedModelId) {
+      await apiRequest(API_STATE, {
+        method: "PUT",
+        body: JSON.stringify({ selected_model_id: selectedModelId || null }),
+      });
+    }
+
+    async function setModelTransform(modelId, transform) {
+      await apiRequest(`${API_MODELS}/${encodeURIComponent(modelId)}/transform`, {
+        method: "PUT",
+        body: JSON.stringify(transform),
+      });
+    }
+
+    function initViewer() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(backgroundColorInput.value);
+
+      camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000000);
+      camera.position.set(1200, 900, 1200);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
+      renderer.setClearColor(0x000000, 0);
+      renderer.setPixelRatio(window.devicePixelRatio || 1);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.getElementById("canvasHost").appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+      const light = new THREE.DirectionalLight(0xffffff, 0.95);
+      light.position.set(5, 7, 9);
+      scene.add(light);
+
+      gridHelper = new THREE.GridHelper(2000, 20, 0x2a3958, 0x1b2740);
+      gridHelper.position.y = -1;
+      scene.add(gridHelper);
+
+      renderer.domElement.addEventListener("click", handleClickToFocus);
+      window.addEventListener("resize", onResize);
+      onResize();
+      animate();
+    }
+
+    function applyAppearance() {
+      scene.background = transparentCheck.checked ? null : new THREE.Color(backgroundColorInput.value);
+
+      if (mesh) {
+        mesh.material.color.set(modelColorInput.value);
+        mesh.material.transparent = transparentCheck.checked;
+        mesh.material.opacity = transparentCheck.checked ? 0.6 : 1.0;
+      }
+
+      if (edgeLines) {
+        edgeLines.visible = edgeVisibleCheck.checked;
+        edgeLines.material.color.set(edgeColorInput.value);
+      }
+
+      saveUIState();
+      renderer.render(scene, camera);
+    }
+
+    function makeDownloadName(extension) {
+      const base = (currentRecord?.name || "stl-viewer")
+        .replace(/\.[^.]+$/, "")
+        .replace(/[\\/:*?"<>|]+/g, "_")
+        .trim() || "stl-viewer";
+      return `${base}.${extension}`;
+    }
+
+    async function exportTransparentWebp() {
+      if (!renderer || !scene || !camera) return;
+
+      const prevBackground = scene.background;
+      const prevGridVisible = gridHelper ? gridHelper.visible : true;
+      const prevSize = new THREE.Vector2();
+      renderer.getSize(prevSize);
+      const prevPixelRatio = renderer.getPixelRatio();
+      const exportScale = Math.max(1, Number(exportScaleSelect.value) || 2);
+
+      scene.background = null;
+      if (gridHelper) gridHelper.visible = Boolean(exportGridCheck.checked);
+
+      renderer.setPixelRatio(1);
+      renderer.setSize(prevSize.x * exportScale, prevSize.y * exportScale, false);
+      camera.aspect = (prevSize.x * exportScale) / (prevSize.y * exportScale);
+      camera.updateProjectionMatrix();
+      renderer.render(scene, camera);
+
+      const downloadName = makeDownloadName("webp");
+      const blob = await new Promise((resolve) => {
+        renderer.domElement.toBlob((result) => resolve(result), "image/webp", 0.98);
+      });
+
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = downloadName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } else {
+        const url = renderer.domElement.toDataURL("image/webp", 0.98);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = downloadName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+
+      scene.background = prevBackground;
+      if (gridHelper) gridHelper.visible = prevGridVisible;
+      renderer.setPixelRatio(prevPixelRatio);
+      renderer.setSize(prevSize.x, prevSize.y, false);
+      camera.aspect = prevSize.x / prevSize.y;
+      camera.updateProjectionMatrix();
+      applyAppearance();
+    }
+
+    function clearSceneObjects() {
+      if (modelGroup) {
+        scene.remove(modelGroup);
+        modelGroup.traverse((object) => {
+          if (object.geometry) {
+            object.geometry.dispose();
+          }
+          if (object.material) {
+            object.material.dispose();
+          }
+        });
+        modelGroup = null;
+      }
+      mesh = null;
+      edgeLines = null;
+    }
+
+    function setTransformUI(transform) {
+      posXInput.value = Number(transform.position?.[0] || 0).toFixed(2);
+      posYInput.value = Number(transform.position?.[1] || 0).toFixed(2);
+      posZInput.value = Number(transform.position?.[2] || 0).toFixed(2);
+      rotXInput.value = radToDeg(transform.rotation?.[0] || 0).toFixed(2);
+      rotYInput.value = radToDeg(transform.rotation?.[1] || 0).toFixed(2);
+      rotZInput.value = radToDeg(transform.rotation?.[2] || 0).toFixed(2);
+    }
+
+    function readTransformUI() {
+      return {
+        position: [
+          Number(posXInput.value) || 0,
+          Number(posYInput.value) || 0,
+          Number(posZInput.value) || 0,
+        ],
+        rotation: [
+          degToRad(rotXInput.value),
+          degToRad(rotYInput.value),
+          degToRad(rotZInput.value),
+        ],
+      };
+    }
+
+    async function applyCurrentTransform(persist = true) {
+      if (!modelGroup || !currentModelId) {
+        return;
+      }
+      const transform = readTransformUI();
+      currentTransform = transform;
+      modelGroup.position.set(...transform.position);
+      modelGroup.rotation.set(...transform.rotation);
+      modelGroup.rotation.order = "XYZ";
+      if (persist) {
+        await setModelTransform(currentModelId, transform);
+      }
+      renderer.render(scene, camera);
+      showCameraInfo();
+    }
+
+    async function nudgeRotation(axis, deltaDeg) {
+      const transform = readTransformUI();
+      const index = { x: 0, y: 1, z: 2 }[axis];
+      transform.rotation[index] += degToRad(deltaDeg);
+      setTransformUI(transform);
+      await applyCurrentTransform(true);
+      await alignBaseToGround();
+    }
+
+    async function resetCurrentTransform() {
+      const transform = {
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+      };
+      setTransformUI(transform);
+      await applyCurrentTransform(true);
+    }
+
+    async function alignBaseToGround() {
+      if (!modelGroup || !currentModelId) return;
+
+      modelGroup.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(modelGroup);
+      if (box.isEmpty()) return;
+
+      const transform = readTransformUI();
+      transform.position[1] += -box.min.y;
+      setTransformUI(transform);
+      await applyCurrentTransform(true);
+    }
+
+    async function applyOrientationPreset(view) {
+      if (!modelGroup || !currentModelId) return;
+
+      const transform = readTransformUI();
+      if (view === "top") {
+        transform.rotation = [-Math.PI / 2, 0, 0];
+      } else if (view === "side") {
+        transform.rotation = [0, Math.PI / 2, 0];
+      } else {
+        transform.rotation = [0, 0, 0];
+      }
+
+      setTransformUI(transform);
+      await applyCurrentTransform(true);
+      await alignBaseToGround();
+    }
+
+    function showModelInfo(record, geometry, size, center) {
+      const vCount = geometry.attributes.position.count;
+      const mb = record.size ? (record.size / (1024 * 1024)).toFixed(2) : "0.00";
+      const updatedAt = record.updated_at || record.updatedAt || Date.now();
+      const transform = record.transform || currentTransform;
+      modelInfo.innerHTML = [
+        `📁 <strong>モデル情報</strong>`,
+        `<br><strong>ファイル:</strong> ${escapeHtml(record.name)}`,
+        `<br><strong>頂点数:</strong> ${vCount.toLocaleString()}`,
+        `<br><strong>サイズ:</strong> ${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)}`,
+        `<br><strong>中心:</strong> (${center.x.toFixed(2)}, ${center.y.toFixed(2)}, ${center.z.toFixed(2)})`,
+        `<br><strong>更新:</strong> ${new Date(updatedAt).toLocaleString()}`,
+        `<br><strong>位置:</strong> (${(transform.position?.[0] || 0).toFixed(2)}, ${(transform.position?.[1] || 0).toFixed(2)}, ${(transform.position?.[2] || 0).toFixed(2)})`,
+        `<br><strong>回転:</strong> (${radToDeg(transform.rotation?.[0] || 0).toFixed(2)}°, ${radToDeg(transform.rotation?.[1] || 0).toFixed(2)}°, ${radToDeg(transform.rotation?.[2] || 0).toFixed(2)}°)`,
+        `<br><strong>保存:</strong> ${mb} MB / Server`,
+      ].join("");
+    }
+
+    function showEmptyModelInfo(message) {
+      modelInfo.innerHTML = `📁 <strong>モデル情報</strong><br><span class="muted">${escapeHtml(message)}</span>`;
+    }
+
+    function showCameraInfo() {
+      const position = camera.position;
+      const target = controls.target;
+      cameraInfo.innerHTML = [
+        `📷 <strong>カメラ情報</strong>`,
+        `<br><strong>位置:</strong> (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`,
+        `<br><strong>注視点:</strong> (${target.x.toFixed(2)}, ${target.y.toFixed(2)}, ${target.z.toFixed(2)})`,
+      ].join("");
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function buildLibraryItem(record) {
+      const item = document.createElement("div");
+      item.className = "library-item" + (record.id === currentModelId ? " active" : "");
+      item.dataset.id = record.id;
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      const updatedAt = record.updated_at || record.updatedAt || Date.now();
+      meta.innerHTML = `
+        <span class="name">${escapeHtml(record.name)}</span>
+        <span class="sub">${new Date(updatedAt).toLocaleString()} ・ ${((record.size || 0) / 1024 / 1024).toFixed(2)} MB</span>
+      `;
+
+      const actions = document.createElement("div");
+      actions.className = "actions";
+
+      const loadBtn = document.createElement("button");
+      loadBtn.type = "button";
+      loadBtn.className = "secondary";
+      loadBtn.textContent = "表示";
+      loadBtn.dataset.action = "load";
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.className = "danger";
+      deleteBtn.textContent = "削除";
+      deleteBtn.dataset.action = "delete";
+
+      actions.append(loadBtn, deleteBtn);
+      item.append(meta, actions);
+      return item;
+    }
+
+    async function refreshLibrary(preferredId = null) {
+      const records = await getAllModels();
+      libraryList.replaceChildren();
+      countBadge.textContent = String(records.length);
+
+      if (!records.length) {
+        const empty = document.createElement("div");
+        empty.className = "muted";
+        empty.textContent = "まだSTLがありません。ファイルを追加してください。";
+        libraryList.appendChild(empty);
+        showEmptyModelInfo("未読み込み");
+        currentModelId = null;
+        currentRecord = null;
+        await setServerSelection(null);
+        clearSceneObjects();
+        renderer.render(scene, camera);
+        showCameraInfo();
+        return;
+      }
+
+      records.forEach((record) => {
+        libraryList.appendChild(buildLibraryItem(record));
+      });
+
+      let targetId = preferredId || currentModelId;
+      if (!targetId || !records.some((record) => record.id === targetId)) {
+        targetId = records[0].id;
+      }
+
+      if (targetId && targetId !== currentModelId) {
+        await loadModel(targetId);
+        return;
+      }
+
+      highlightActiveItem();
+    }
+
+    async function reloadLibraryFromServer() {
+      const state = await getServerState();
+      await refreshLibrary(state.selected_model_id || null);
+    }
+
+    function highlightActiveItem() {
+      libraryList.querySelectorAll(".library-item").forEach((item) => {
+        item.classList.toggle("active", item.dataset.id === currentModelId);
+      });
+    }
+
+    async function loadModel(id) {
+      const record = await getModelById(id);
+      if (!record) {
+        return;
+      }
+
+      const blob = await getModelFileBlob(id);
+      const arrayBuffer = await blob.arrayBuffer();
+      const loader = new THREE.STLLoader();
+      const geometry = loader.parse(arrayBuffer);
+
+      if (!geometry || !geometry.attributes || !geometry.attributes.position) {
+        showEmptyModelInfo("STLの読み込みに失敗しました。");
+        return;
+      }
+
+      clearSceneObjects();
+
+      geometry.computeBoundingBox();
+      const box = geometry.boundingBox.clone();
+      const size = new THREE.Vector3();
+      const center = new THREE.Vector3();
+      box.getSize(size);
+      box.getCenter(center);
+
+      const offset = new THREE.Vector3(-center.x, -center.y, -center.z);
+      geometry.translate(offset.x, offset.y, offset.z);
+      geometry.computeBoundingBox();
+
+      const material = new THREE.MeshPhongMaterial({
+        color: modelColorInput.value,
+        transparent: transparentCheck.checked,
+        opacity: transparentCheck.checked ? 0.6 : 1.0,
+        shininess: 30,
+      });
+
+      mesh = new THREE.Mesh(geometry, material);
+      const edgesGeometry = new THREE.EdgesGeometry(geometry, 10);
+      const edgeMaterial = new THREE.LineBasicMaterial({ color: edgeColorInput.value });
+      edgeLines = new THREE.LineSegments(edgesGeometry, edgeMaterial);
+      edgeLines.visible = edgeVisibleCheck.checked;
+      modelGroup = new THREE.Group();
+      modelGroup.add(mesh);
+      modelGroup.add(edgeLines);
+      modelGroup.rotation.order = "XYZ";
+      scene.add(modelGroup);
+
+      currentModelId = record.id;
+      currentRecord = record;
+      await setServerSelection(record.id);
+      const transform = record.transform || await getModelTransform(record.id);
+      currentTransform = {
+        position: transform.position || [0, 0, 0],
+        rotation: transform.rotation || [0, 0, 0],
+      };
+      setTransformUI(currentTransform);
+      await applyCurrentTransform(false);
+      showModelInfo(record, geometry, size, center);
+      focusModel(size, new THREE.Vector3(...currentTransform.position));
+      highlightActiveItem();
+      applyAppearance();
+      showCameraInfo();
+    }
+
+    function focusModel(size, targetPosition = new THREE.Vector3(0, 0, 0)) {
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const distance = Math.max(maxDim * 1.75, 100);
+
+      camera.near = Math.max(distance / 1000, 0.1);
+      camera.far = distance * 1000;
+      camera.updateProjectionMatrix();
+
+      camera.position.set(
+        targetPosition.x + distance,
+        targetPosition.y + distance * 0.75,
+        targetPosition.z + distance
+      );
+      controls.target.copy(targetPosition);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    async function addFiles(files) {
+      const list = Array.from(files || []);
+      if (!list.length) {
+        setUploadStatus("STLファイルが見つかりませんでした。", true);
+        return;
+      }
+
+      try {
+        setUploadStatus(`アップロード中: ${list.length}件`);
+        const result = await uploadModels(list);
+        const created = Array.isArray(result?.created) ? result.created : [];
+        const skipped = Array.isArray(result?.skipped) ? result.skipped : [];
+
+        fileInput.value = "";
+        const totalLoaded = created.length + skipped.length;
+        setUploadStatus(`読み込み完了: ${created.length}件 / 重複スキップ: ${skipped.length}件`, false);
+        const lastAddedId = created.length
+          ? created[created.length - 1].id
+          : (skipped.length ? skipped[0].id : null);
+        if (lastAddedId) {
+          await setServerSelection(lastAddedId);
+        }
+        await refreshLibrary(lastAddedId);
+        return { created, skipped, totalLoaded };
+      } catch (error) {
+        console.error(error);
+        setUploadStatus(`読み込み失敗: ${error?.message || error}`, true);
+        return { created: [], skipped: [], totalLoaded: 0, error };
+      }
+    }
+
+    async function addFolderFiles(files) {
+      const allFiles = Array.from(files || []);
+      const stlFiles = allFiles.filter((file) => {
+        const name = (file?.name || "").toLowerCase();
+        return name.endsWith(".stl");
+      });
+
+      const isRootLevel = (file) => {
+        const relativePath = String(file.webkitRelativePath || file.name || "");
+        if (!relativePath.includes("/")) {
+          return true;
+        }
+        const normalized = relativePath.replaceAll("\\", "/");
+        const parts = normalized.split("/").filter(Boolean);
+        return parts.length <= 2;
+      };
+
+      const list = includeSubdirsCheck.checked ? stlFiles : stlFiles.filter(isRootLevel);
+
+      if (!list.length) {
+        if (stlFiles.length > 0 && !includeSubdirsCheck.checked) {
+          setUploadStatus(
+            `STLは見つかりましたがサブディレクトリ内のみです。検出: ${stlFiles.length}件 / ルート直下: 0件`,
+            true
+          );
+        } else {
+          setUploadStatus(`フォルダ内にSTLが見つかりませんでした。検出: ${allFiles.length}件`, true);
+        }
+        return;
+      }
+      setUploadStatus(`フォルダ検出: ${list.length}件 / 全STL: ${stlFiles.length}件`);
+      folderInput.value = "";
+      await addFiles(list);
+      await reloadLibraryFromServer();
+    }
+
+    async function deleteCurrentSelection() {
+      if (!currentModelId) return;
+      currentModelId = null;
+      currentRecord = null;
+      await setServerSelection(null);
+      highlightActiveItem();
+      clearSceneObjects();
+      showEmptyModelInfo("選択解除しました");
+      renderer.render(scene, camera);
+      showCameraInfo();
+    }
+
+    async function deleteById(id) {
+      await deleteModel(id);
+      if (currentModelId === id) {
+        currentModelId = null;
+        currentRecord = null;
+        await setServerSelection(null);
+      }
+      await refreshLibrary(currentModelId || null);
+    }
+
+    async function deleteAll() {
+      await clearAllModels();
+      currentModelId = null;
+      currentRecord = null;
+      await setServerSelection(null);
+      await refreshLibrary();
+    }
+
+    async function handleLibraryClick(event) {
+      const item = event.target.closest(".library-item");
+      if (!item) return;
+
+      const id = item.dataset.id;
+      const action = event.target.dataset.action;
+
+      if (action === "delete") {
+        event.stopPropagation();
+        await deleteById(id);
+        return;
+      }
+
+      if (action === "load" || event.target === item || event.target.closest(".meta")) {
+        await loadModel(id);
+      }
+    }
+
+    function setDropZone(active) {
+      dropZone.classList.toggle("active", active);
+    }
+
+    function bindEvents() {
+      addFilesBtn.addEventListener("click", () => addFiles(fileInput.files));
+      reloadBtn.addEventListener("click", () => reloadLibraryFromServer());
+      loadFolderBtn.addEventListener("click", async () => {
+        try {
+          if (typeof folderInput.showPicker === "function") {
+            await folderInput.showPicker();
+          } else {
+            folderInput.click();
+          }
+        } catch (error) {
+          folderInput.click();
+        }
+      });
+      clearSelectionBtn.addEventListener("click", deleteCurrentSelection);
+      clearAllBtn.addEventListener("click", deleteAll);
+      libraryList.addEventListener("click", handleLibraryClick);
+
+      fileInput.addEventListener("change", () => addFiles(fileInput.files));
+      folderInput.addEventListener("change", () => addFolderFiles(folderInput.files));
+
+      [modelColorInput, edgeColorInput, backgroundColorInput, transparentCheck, edgeVisibleCheck]
+        .forEach((control) => control.addEventListener("input", applyAppearance));
+      [exportScaleSelect, exportGridCheck, includeSubdirsCheck]
+        .forEach((control) => control.addEventListener("change", applyAppearance));
+
+      [posXInput, posYInput, posZInput]
+        .forEach((control) => control.addEventListener("change", () => applyCurrentTransform(true)));
+
+      [rotXInput, rotYInput, rotZInput]
+        .forEach((control) => control.addEventListener("change", async () => {
+          await applyCurrentTransform(true);
+          await alignBaseToGround();
+        }));
+
+      document.querySelectorAll("[data-rotate-axis]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await nudgeRotation(button.dataset.rotateAxis, Number(button.dataset.rotateDir || 0) * 90);
+        });
+      });
+
+      document.querySelectorAll("[data-orientation-view]").forEach((button) => {
+        button.addEventListener("click", () => applyOrientationPreset(button.dataset.orientationView));
+      });
+
+      document.getElementById("alignBaseBtn").addEventListener("click", () => alignBaseToGround());
+      exportWebpBtn.addEventListener("click", async () => {
+        try {
+          await exportTransparentWebp();
+        } catch (error) {
+          console.error(error);
+          alert(error?.message || "WEBPの保存に失敗しました");
+        }
+      });
+      resetTransformBtn.addEventListener("click", () => resetCurrentTransform());
+
+      window.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        setDropZone(true);
+      });
+
+      window.addEventListener("dragleave", (event) => {
+        if (event.relatedTarget == null) {
+          setDropZone(false);
+        }
+      });
+
+      window.addEventListener("drop", (event) => {
+        event.preventDefault();
+        setDropZone(false);
+        const files = event.dataTransfer?.files;
+        if (files && files.length) {
+          addFiles(files);
+        }
+      });
+    }
+
+    function handleClickToFocus(event) {
+      if (!mesh) return;
+
+      const rect = renderer.domElement.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      );
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObjects([mesh], true);
+      if (!hits.length) return;
+
+      const point = hits[0].point.clone();
+      controls.target.copy(point);
+
+      const direction = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+      const distance = camera.position.distanceTo(controls.target);
+      camera.position.copy(point.clone().add(direction.multiplyScalar(distance)));
+      controls.update();
+      showCameraInfo();
+    }
+
+    function onResize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height, false);
+      renderer.render(scene, camera);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+      showCameraInfo();
+    }
+
+    async function bootstrap() {
+      initViewer();
+      bindEvents();
+      await reloadLibraryFromServer();
+      applyAppearance();
+    }
+
+    bootstrap().catch((error) => {
+      console.error(error);
+      showEmptyModelInfo("初期化に失敗しました。コンソールを確認してください。");
+    });
+  </script>
+</body>
+</html>
